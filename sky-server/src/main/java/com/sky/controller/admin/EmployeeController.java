@@ -72,12 +72,6 @@ public class EmployeeController {
     public Result<String> logout() {
         return Result.success();
     }
-
-//    @GetMapping
-//    public Result page(Employee employee){
-//
-//    }
-
     /**
      *  新增员工
      * */
@@ -97,6 +91,14 @@ public class EmployeeController {
         log.info("员工分页查询，参数{}",employeePageQueryDTO);
         PageResult pageResult = employeeService.page(employeePageQueryDTO);
         return Result.success(pageResult);
+    }
 
+    //修改员工状态
+    @PostMapping("/status/{status}")
+    @ApiOperation("员工状态禁用/启用")
+    public Result startOrStop(@PathVariable Integer status,Long id){
+        log.info("员工状态禁用/启用");
+        employeeService.startOrStop(status,id);
+        return Result.success();
     }
 }
