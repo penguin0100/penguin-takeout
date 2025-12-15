@@ -77,7 +77,7 @@ public class EmployeeController {
      * */
     @PostMapping
     @ApiOperation("新增员工")
-    public Result save(@RequestBody EmployeeDTO employeeDTO){
+    public Result<String> save(@RequestBody EmployeeDTO employeeDTO){
         log.info("新增员工:{}",employeeDTO);
         employeeService.save(employeeDTO);
         return Result.success();
@@ -96,7 +96,7 @@ public class EmployeeController {
     //修改员工状态
     @PostMapping("/status/{status}")
     @ApiOperation("员工状态禁用/启用")
-    public Result startOrStop(@PathVariable Integer status,Long id){
+    public Result<String> startOrStop(@PathVariable Integer status,Long id){
         log.info("员工状态禁用/启用");
         employeeService.startOrStop(status,id);
         return Result.success();
@@ -109,7 +109,7 @@ public class EmployeeController {
     }
     @PutMapping
     @ApiOperation("员工信息修改")
-    public Result update(@RequestBody EmployeeDTO employeeDTO){
+    public Result<String> update(@RequestBody EmployeeDTO employeeDTO){
         log.info("员工信息修改:{}",employeeDTO);
         employeeService.update(employeeDTO);
         return Result.success();
