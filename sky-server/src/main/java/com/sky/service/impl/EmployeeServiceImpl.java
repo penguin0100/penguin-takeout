@@ -86,11 +86,11 @@ public class EmployeeServiceImpl implements EmployeeService {
         //设置默认密码-密码md5加密
         employee.setPassword(DigestUtils.md5DigestAsHex(PasswordConstant.DEFAULT_PASSWORD.getBytes()));
         //设置创建时间-修改时间
-        employee.setCreateTime(LocalDateTime.now());
-        employee.setUpdateTime(LocalDateTime.now());
+        //employee.setCreateTime(LocalDateTime.now());
+        //employee.setUpdateTime(LocalDateTime.now());
         //设置创建人-修改人(从JWT令牌中获取的ID)
-        employee.setCreateUser(BaseContext.getCurrentId());
-        employee.setUpdateUser(BaseContext.getCurrentId());
+        //employee.setCreateUser(BaseContext.getCurrentId());
+        //employee.setUpdateUser(BaseContext.getCurrentId());
         //插入数据
         employeeMapper.insert(employee);
     }
@@ -127,8 +127,8 @@ public class EmployeeServiceImpl implements EmployeeService {
         //创建一个employee对象 目的:封装员工数据 在xml的update中使用的时employee对象
         Employee employee = new Employee();
         //拷贝
-        BeanUtils.copyProperties(employeeDTO,employee);
-        employee.setUpdateTime(LocalDateTime.now());
+        //BeanUtils.copyProperties(employeeDTO,employee);
+        //employee.setUpdateTime(LocalDateTime.now());
         //从拦截器中获得修改人
         employee.setUpdateUser(BaseContext.getCurrentId());
         employeeMapper.update(employee);
