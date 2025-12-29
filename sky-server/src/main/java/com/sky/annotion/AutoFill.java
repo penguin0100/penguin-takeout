@@ -15,5 +15,5 @@ public @interface AutoFill   {
     /*
      * 指定数据库操作类型：插入、更新
      */
-    OperationType value();
+    public OperationType value();
 }

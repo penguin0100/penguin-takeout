@@ -21,10 +21,11 @@ import java.time.LocalDateTime;
 public class AutoFillAspect {
     // 切点
     @Pointcut("execution(* com.sky.mapper.*.*(..)) && @annotation(com.sky.annotion.AutoFill)")
-    public void autoFillPointCut(){
+    // AOP切点(Pointcut)方法
+    public void autoFillPointCut(){// 将公共的切点表达式抽象出来，方便其他地方引用
     }
     // 前置通知：为公共字段赋值
-    @Before("autoFillPointCut()")
+    @Before("autoFillPointCut()")// 前置通知引用切点方法:autoFillPointCut()
     public void autoFill(JoinPoint joinPoint){
         log.info("开始进行公共字段自动填充");
         // 获取当前被拦截的方法参数，即实体对象  (反射)
