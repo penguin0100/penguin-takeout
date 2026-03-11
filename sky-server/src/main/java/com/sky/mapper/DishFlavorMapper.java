@@ -7,8 +7,6 @@ import java.util.List;
 
 @Mapper
 
-public class DishFlavorMapper {
-
-    public void insertBatch(List<DishFlavor> flavors) {
-    }
+public interface DishFlavorMapper {
+    public void insertBatch(List<DishFlavor> flavors);
 }
