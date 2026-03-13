@@ -10,19 +10,27 @@
         values (#{name}, #{categoryId}, #{price}, #{image}, #{description}, #{createTime}, #{updateTime}, #{createUser},
                 #{updateUser}, #{status})
     </insert>
+    <!-- 分页查询数据 -->
     <select id="pageQuery" resultType="com.sky.vo.DishVO">
         select d.* , c.name as categoryName from dish d left outer join category c on d.category_id = c.id
         <where>
             <if test="name != null">
-                and d.name like concat('%',#{name},'%');
+                and d.name like concat('%',#{name},'%')
             </if>
             <if test="categoryId != null">
-                and d.category_id = #{categoryId};
+                and d.category_id = #{categoryId}
             </if>
             <if test="status != null">
-                and d.status = #{status};
+                and d.status = #{status}
             </if>
         </where>
         order by update_time desc
     </select>
+    <!-- 批量删除菜品 -->
+    <delete id="deleteByIds">
+        delete from dish where id in
+        <foreach item="id" collection="list" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
 </mapper>

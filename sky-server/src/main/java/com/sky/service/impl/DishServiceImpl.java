@@ -53,4 +53,9 @@ public class DishServiceImpl implements DishService {
         Page<DishVO> page = dishMapper.pageQuery(dishPageQueryDTO);
         return new PageResult( page.getTotal(), page.getResult());
     }
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public void deleteByIds(List<Integer> ids) {
+        dishMapper.deleteByIds(ids);
+    }
 }
