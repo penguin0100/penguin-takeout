@@ -10,6 +10,21 @@
         values (#{name}, #{categoryId}, #{price}, #{image}, #{description}, #{createTime}, #{updateTime}, #{createUser},
                 #{updateUser}, #{status})
     </insert>
+    <!-- 修改数据 -->
+    <update id="update">
+        update dish
+        <set>
+            <if test="name != null"> name = #{name},</if>
+            <if test="categoryId != null"> category_id = #{categoryId},</if>
+            <if test="price != null"> price = #{price},</if>
+            <if test="image != null"> image = #{image},</if>
+            <if test="description != null"> description = #{description},</if>
+            <if test="status != null"> status = #{status},</if>
+            <if test="updateTime != null"> update_time = #{updateTime},</if>
+            <if test="updateUser != null"> update_user = #{updateUser},</if>
+        </set>
+        where id = #{id}
+    </update>
     <!-- 分页查询数据 -->
     <select id="pageQuery" resultType="com.sky.vo.DishVO">
         select d.* , c.name as categoryName from dish d left outer join category c on d.category_id = c.id
@@ -26,11 +41,11 @@
         </where>
         order by update_time desc
     </select>
-    <!-- 批量删除菜品 -->
-    <delete id="deleteByIds">
-        delete from dish where id in
+    <!-- 批量查询菜品 -->
+    <select id="getByIds" resultType="com.sky.entity.Dish">
+        select * from dish where id in
         <foreach item="id" collection="list" open="(" separator="," close=")">
             #{id}
         </foreach>
-    </delete>
+    </select>
 </mapper>
