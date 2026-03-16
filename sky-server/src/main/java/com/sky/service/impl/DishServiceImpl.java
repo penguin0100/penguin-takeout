@@ -122,7 +122,7 @@ public class DishServiceImpl implements DishService {
             dishFlavorMapper.deleteByDishId(id);
         }
     }
-
+    // 起售、停售
     @Override
     public void startOrStop(Integer status, Long id) {
         Dish dish = Dish.builder()
@@ -134,16 +134,16 @@ public class DishServiceImpl implements DishService {
         if (status == StatusConstant.DISABLE) {
             // 如果是停售操作，还需要将包含当前菜品的套餐也停售
             List<Long> dishIds = new ArrayList<>();
-            dishIds.add(id);
+            dishIds.add(id); //将当前菜品的 ID 添加到列表中
             // select setmeal_id from setmeal_dish where dish_id in (?,?,?)
-            List<Long> setmealIds = setmealDishMapper.getSetmealIdsByDishIds(dishIds);
-            if (setmealIds != null && setmealIds.size() > 0) {
-                for (Long setmealId : setmealIds) {
-                    Setmeal setmeal = Setmeal.builder()
+            List<Long> setmealIds = setmealDishMapper.getSetmealIdsByDishIds(dishIds); //查询包含当前菜品的所有套餐 ID
+            if (setmealIds != null && setmealIds.size() > 0) { //检查是否有套餐包含了当前菜品
+                for (Long setmealId : setmealIds) {//遍历所有需要停售的套餐 ID
+                    Setmeal setmeal = Setmeal.builder()//创建一个套餐对象，设置新的状态为"停售"
                             .id(setmealId)
                             .status(StatusConstant.DISABLE)
                             .build();
-                    setmealMapper.update(setmeal);
+                    setmealMapper.update(setmeal);//更新数据库中套餐的状态
                 }
             }
         }
