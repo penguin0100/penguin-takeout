@@ -17,6 +17,7 @@ import com.sky.mapper.SetmealMapper;
 import com.sky.result.PageResult;
 import com.sky.service.DishService;
 import com.sky.vo.DishVO;
+import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -147,5 +148,15 @@ public class DishServiceImpl implements DishService {
                 }
             }
         }
+    }
+
+    // 根据分类id查询菜品
+    @Override
+    public List<Dish> list(Long categoryId) {
+        Dish dish = Dish.builder()
+                    .categoryId(categoryId)
+                    .status(StatusConstant.ENABLE)
+                    .build();
+        return dishMapper.list(dish);
     }
 }

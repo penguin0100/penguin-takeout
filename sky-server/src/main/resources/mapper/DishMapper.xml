@@ -41,11 +41,14 @@
         </where>
         order by update_time desc
     </select>
-    <!-- 批量查询菜品 -->
-    <select id="getByIds" resultType="com.sky.entity.Dish">
-        select * from dish where id in
-        <foreach item="id" collection="list" open="(" separator="," close=")">
-            #{id}
-        </foreach>
+    <!--根据分类id查询菜品-->
+    <select id="list" resultType="Dish" parameterType="Dish">
+        select * from dish
+        <where>
+                <if test="name != null"> and name like concat('%',#{name},'%')</if>
+                <if test="categoryId != null">and category_id = #{categoryId}</if>
+                <if test="status != null">and status = #{status}</if>
+        </where>
+        order by create_time desc
     </select>
 </mapper>
