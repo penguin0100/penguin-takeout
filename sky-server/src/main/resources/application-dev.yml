@@ -11,3 +11,7 @@ sky:
     access-key-id: LTAI5tE6WHyi5dyCBQT6sLe4
     access-key-secret: rcHxAvD0mdqLFJ5SvGeSiesfoFLU1R
     bucket-name: java-wai-mai
+  redis:
+    host: localhost
+    port: 6379
+    database: 10
