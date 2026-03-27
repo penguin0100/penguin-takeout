@@ -1,6 +1,6 @@
 package com.sky.aspect;
 
-import com.sky.annotion.AutoFill;
+import com.sky.annotation.AutoFill;
 
 import com.sky.context.BaseContext;
 import com.sky.enumeration.OperationType;
@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
 @Slf4j
 public class AutoFillAspect {
     // 切点
-    @Pointcut("execution(* com.sky.mapper.*.*(..)) && @annotation(com.sky.annotion.AutoFill)")
+    @Pointcut("execution(* com.sky.mapper.*.*(..)) && @annotation(com.sky.annotation.AutoFill)")
     // AOP切点(Pointcut)方法
     public void autoFillPointCut(){// 将公共的切点表达式抽象出来，方便其他地方引用
     }
