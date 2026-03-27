@@ -391,9 +391,6 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 订单搜索
-     *
-     * @param ordersPageQueryDTO
-     * @return
      */
     public PageResult conditionSearch(OrdersPageQueryDTO ordersPageQueryDTO) {
         PageHelper.startPage(ordersPageQueryDTO.getPage(), ordersPageQueryDTO.getPageSize());
