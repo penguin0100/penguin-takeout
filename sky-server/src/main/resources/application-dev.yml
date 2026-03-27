@@ -25,3 +25,7 @@ sky:
     weChatPayCertFilePath: D:\certs\wechatpay_cert.pem
     notifyUrl: https://yourdomain.com/wx/notify
     refundNotifyUrl: https://yourdomain.com/wx/refund-notify
+  shop:
+    address: 北京市海淀区上地十街 10 号
+  baidu:
+    ak: 你的百度地图 AK
