@@ -25,4 +25,9 @@ public class MessageConstant {
     public static final String ORDER_STATUS_ERROR = "订单状态错误";
     public static final String ORDER_NOT_FOUND = "订单不存在";
 
+    // 库存相关
+    public static final String DISH_STOCK_NOT_ENOUGH = "菜品库存不足";
+    public static final String SETMEAL_STOCK_NOT_ENOUGH = "套餐库存不足";
+    public static final String SYSTEM_BUSY = "系统繁忙，请稍后再试";
+
 }

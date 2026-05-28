@@ -109,4 +109,11 @@ public interface OrderService {
      * @param id
      */
     void reminder(Long id);
+
+    /**
+     * 生成订单防重 Token
+     * @param userId 用户 ID
+     * @return Token 字符串
+     */
+    String generateOrderToken(Long userId);
 }

@@ -1,5 +1,6 @@
 package com.sky.controller.user;
 
+import com.sky.context.BaseContext;
 import com.sky.dto.OrdersPaymentDTO;
 import com.sky.dto.OrdersSubmitDTO;
 import com.sky.result.PageResult;
@@ -104,5 +105,17 @@ public class OrderController {
     public Result reminder(@PathVariable("id") Long id){
         orderService.reminder(id);
         return Result.success();
+    }
+
+    /**
+     * 获取订单防重 Token
+     * @return Token 字符串
+     */
+    @GetMapping("/token")
+    @ApiOperation("获取订单防重Token")
+    public Result<String> getOrderToken() {
+        Long userId = BaseContext.getCurrentId();
+        String token = orderService.generateOrderToken(userId);
+        return Result.success(token);
     }
 }

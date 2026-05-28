@@ -16,6 +16,7 @@ import com.sky.mapper.*;
 import com.sky.result.PageResult;
 import com.sky.service.OrderService;
 import com.sky.utils.HttpClientUtil;
+import com.sky.utils.RedisLockUtil;
 import com.sky.utils.WeChatPayUtil;
 import com.sky.vo.OrderPaymentVO;
 import com.sky.vo.OrderStatisticsVO;
@@ -26,16 +27,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+
+import javax.annotation.PostConstruct;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -56,6 +59,32 @@ public class OrderServiceImpl implements OrderService {
     private WeChatPayUtil weChatPayUtil;
     @Autowired
     private WebSocketServer webSocketServer;
+    @Autowired
+    private RedisLockUtil redisLockUtil;
+    @Autowired
+    private RedisTemplate redisTemplate;
+
+    /**
+     * 防重 Token Lua 脚本：检查并删除 Token（原子操作）
+     * KEYS[1] = ORDER_TOKEN:{userId}:{token}
+     * 返回 1 表示 Token 有效（已删除），0 表示无效或重复
+     */
+    private DefaultRedisScript<Long> checkAndDeleteTokenScript;
+
+    @PostConstruct
+    private void initTokenScript() {
+        checkAndDeleteTokenScript = new DefaultRedisScript<>();
+        checkAndDeleteTokenScript.setScriptText(
+            "if redis.call('exists', KEYS[1]) == 1 then " +
+            "    redis.call('del', KEYS[1]) " +
+            "    return 1 " +
+            "end " +
+            "return 0"
+        );
+        checkAndDeleteTokenScript.setResultType(Long.class);
+    }
+
+    private static final String ORDER_TOKEN_PREFIX = "ORDER_TOKEN:";
 
     /**
      * 用户下单
@@ -64,6 +93,19 @@ public class OrderServiceImpl implements OrderService {
      */
     @Transactional
     public OrderSubmitVO submitOrder(OrdersSubmitDTO ordersSubmitDTO) {
+
+        //0. 防重 Token 校验（Lua 脚本原子性检查）
+        Long userId = BaseContext.getCurrentId();
+        String orderToken = ordersSubmitDTO.getOrderToken();
+        if (orderToken != null && !orderToken.isEmpty()) {
+            String tokenKey = ORDER_TOKEN_PREFIX + userId + ":" + orderToken;
+            Long result = (Long) redisTemplate.execute(checkAndDeleteTokenScript, Collections.singletonList(tokenKey));
+            if (result == null || result == 0) {
+                log.warn("重复提交检测：userId={}, token={}", userId, orderToken);
+                throw new OrderBusinessException(MessageConstant.SYSTEM_BUSY);
+            }
+            log.debug("防重 Token 校验通过: {}", tokenKey);
+        }
 
         //1. 处理各种业务异常（地址簿为空、购物车数据为空）
         AddressBook addressBook = addressBookMapper.getById(ordersSubmitDTO.getAddressBookId());
@@ -76,8 +118,6 @@ public class OrderServiceImpl implements OrderService {
         //checkOutOfRange(addressBook.getCityName() + addressBook.getDistrictName() + addressBook.getDetail());
 
         //查询当前用户的购物车数据
-        Long userId = BaseContext.getCurrentId();
-
         ShoppingCart shoppingCart = new ShoppingCart();
         shoppingCart.setUserId(userId);
         List<ShoppingCart> shoppingCartList = shoppingCartMapper.list(shoppingCart);
@@ -86,6 +126,74 @@ public class OrderServiceImpl implements OrderService {
             //抛出业务异常
             throw new ShoppingCartBusinessException(MessageConstant.SHOPPING_CART_IS_NULL);
         }
+
+        // --- 新增：Redis 分布式锁防超卖 ---
+        // 1. 收集所有锁 Key，去重后排序（避免死锁）
+        List<String> lockKeys = shoppingCartList.stream()
+                .map(cart -> cart.getDishId() != null
+                        ? RedisLockUtil.getDishLockKey(cart.getDishId())
+                        : RedisLockUtil.getSetmealLockKey(cart.getSetmealId()))
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
+
+        // 2. 批量加锁
+        List<String> acquiredLocks = new ArrayList<>();
+        try {
+            for (String lockKey : lockKeys) {
+                if (!redisLockUtil.tryLock(lockKey, 30)) {
+                    throw new OrderBusinessException(MessageConstant.SYSTEM_BUSY);
+                }
+                acquiredLocks.add(lockKey);
+            }
+
+            // 3. 批量检查库存，记录设置了库存限制的 key
+            Set<String> managedStockKeys = new HashSet<>();
+            for (ShoppingCart cart : shoppingCartList) {
+                if (cart.getDishId() != null) {
+                    String stockKey = RedisLockUtil.getDishStockKey(cart.getDishId());
+                    Integer stock = (Integer) redisTemplate.opsForValue().get(stockKey);
+                    if (stock != null) {
+                        if (stock < cart.getNumber()) {
+                            throw new OrderBusinessException(cart.getName() + MessageConstant.DISH_STOCK_NOT_ENOUGH);
+                        }
+                        managedStockKeys.add(stockKey);
+                    }
+                }
+                if (cart.getSetmealId() != null) {
+                    String stockKey = RedisLockUtil.getSetmealStockKey(cart.getSetmealId());
+                    Integer stock = (Integer) redisTemplate.opsForValue().get(stockKey);
+                    if (stock != null) {
+                        if (stock < cart.getNumber()) {
+                            throw new OrderBusinessException(cart.getName() + MessageConstant.SETMEAL_STOCK_NOT_ENOUGH);
+                        }
+                        managedStockKeys.add(stockKey);
+                    }
+                }
+            }
+
+            // 4. 批量扣减库存（仅扣减有库存限制的商品）
+            for (ShoppingCart cart : shoppingCartList) {
+                if (cart.getDishId() != null) {
+                    String stockKey = RedisLockUtil.getDishStockKey(cart.getDishId());
+                    if (managedStockKeys.contains(stockKey)) {
+                        redisTemplate.opsForValue().decrement(stockKey, cart.getNumber());
+                    }
+                }
+                if (cart.getSetmealId() != null) {
+                    String stockKey = RedisLockUtil.getSetmealStockKey(cart.getSetmealId());
+                    if (managedStockKeys.contains(stockKey)) {
+                        redisTemplate.opsForValue().decrement(stockKey, cart.getNumber());
+                    }
+                }
+            }
+        } finally {
+            // 5. 释放所有锁
+            for (String lockKey : acquiredLocks) {
+                redisLockUtil.unlock(lockKey);
+            }
+        }
+        // --- 库存检查与扣减结束 ---
 
         //2. 向订单表插入1条数据
         Orders orders = new Orders();
@@ -369,6 +477,41 @@ public class OrderServiceImpl implements OrderService {
         orders.setCancelReason("用户取消");
         orders.setCancelTime(LocalDateTime.now());
         orderMapper.update(orders);
+
+        // 恢复 Redis 库存
+        restoreStock(id);
+    }
+
+    /**
+     * 恢复订单占用的 Redis 库存
+     *
+     * @param orderId 订单 ID
+     */
+    private void restoreStock(Long orderId) {
+        List<OrderDetail> orderDetails = orderDetailMapper.getByOrderId(orderId);
+        for (OrderDetail detail : orderDetails) {
+            if (detail.getDishId() != null) {
+                String stockKey = RedisLockUtil.getDishStockKey(detail.getDishId());
+                String lockKey = RedisLockUtil.getDishLockKey(detail.getDishId());
+                try {
+                    redisLockUtil.tryLock(lockKey, 10);
+                    // Redis 中没有该库存 key 时，increment 会自动创建
+                    redisTemplate.opsForValue().increment(stockKey, detail.getNumber());
+                } finally {
+                    redisLockUtil.unlock(lockKey);
+                }
+            }
+            if (detail.getSetmealId() != null) {
+                String stockKey = RedisLockUtil.getSetmealStockKey(detail.getSetmealId());
+                String lockKey = RedisLockUtil.getSetmealLockKey(detail.getSetmealId());
+                try {
+                    redisLockUtil.tryLock(lockKey, 10);
+                    redisTemplate.opsForValue().increment(stockKey, detail.getNumber());
+                } finally {
+                    redisLockUtil.unlock(lockKey);
+                }
+            }
+        }
     }
 
     /**
@@ -520,6 +663,9 @@ public class OrderServiceImpl implements OrderService {
         orders.setCancelTime(LocalDateTime.now());
 
         orderMapper.update(orders);
+
+        // 恢复 Redis 库存
+        restoreStock(ordersRejectionDTO.getId());
     }
 
     /**
@@ -550,6 +696,9 @@ public class OrderServiceImpl implements OrderService {
         orders.setCancelReason(ordersCancelDTO.getCancelReason());
         orders.setCancelTime(LocalDateTime.now());
         orderMapper.update(orders);
+
+        // 恢复 Redis 库存
+        restoreStock(ordersCancelDTO.getId());
     }
 
     /**
@@ -617,5 +766,20 @@ public class OrderServiceImpl implements OrderService {
 
         //通过websocket向客户端浏览器推送消息
         webSocketServer.sendToAllClient(JSON.toJSONString(map));
+    }
+
+    /**
+     * 生成订单防重 Token
+     * 存入 Redis，有效期 5 分钟
+     *
+     * @param userId 用户 ID
+     * @return Token 字符串
+     */
+    public String generateOrderToken(Long userId) {
+        String token = UUID.randomUUID().toString().replace("-", "");
+        String key = ORDER_TOKEN_PREFIX + userId + ":" + token;
+        redisTemplate.opsForValue().set(key, "1", 5, TimeUnit.MINUTES);
+        log.info("生成防重 Token: key={}", key);
+        return token;
     }
 }

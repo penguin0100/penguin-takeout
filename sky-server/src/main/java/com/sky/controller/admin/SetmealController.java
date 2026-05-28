@@ -5,15 +5,18 @@ import com.sky.dto.SetmealPageQueryDTO;
 import com.sky.result.PageResult;
 import com.sky.result.Result;
 import com.sky.service.SetmealService;
+import com.sky.utils.RedisLockUtil;
 import com.sky.vo.SetmealVO;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 套餐管理
@@ -26,6 +29,8 @@ public class SetmealController {
 
     @Autowired
     private SetmealService setmealService;
+    @Autowired
+    private RedisTemplate redisTemplate;
 
     /**
      * 新增套餐
@@ -108,5 +113,30 @@ public class SetmealController {
     public Result startOrStop(@PathVariable Integer status, Long id) {
         setmealService.startOrStop(status, id);
         return Result.success();
+    }
+
+    /**
+     * 设置套餐库存（Redis）
+     */
+    @PostMapping("/stock")
+    @ApiOperation("设置套餐库存")
+    public Result setStock(@RequestBody Map<String, Object> params) {
+        Long setmealId = Long.valueOf(params.get("setmealId").toString());
+        Integer stock = Integer.valueOf(params.get("stock").toString());
+        String key = RedisLockUtil.getSetmealStockKey(setmealId);
+        redisTemplate.opsForValue().set(key, stock);
+        log.info("设置套餐库存 setmealId={}, stock={}", setmealId, stock);
+        return Result.success();
+    }
+
+    /**
+     * 查询套餐库存（Redis）
+     */
+    @GetMapping("/stock/{id}")
+    @ApiOperation("查询套餐库存")
+    public Result<Integer> getStock(@PathVariable Long id) {
+        String key = RedisLockUtil.getSetmealStockKey(id);
+        Integer stock = (Integer) redisTemplate.opsForValue().get(key);
+        return Result.success(stock);
     }
 }

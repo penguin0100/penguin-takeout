@@ -7,14 +7,17 @@ import com.sky.entity.Dish;
 import com.sky.result.PageResult;
 import com.sky.result.Result;
 import com.sky.service.DishService;
+import com.sky.utils.RedisLockUtil;
 import com.sky.vo.DishVO;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/admin/dish")
@@ -23,6 +26,8 @@ import java.util.List;
 public class DishController {
     @Autowired
     private DishService dishService;
+    @Autowired
+    private RedisTemplate redisTemplate;
 
     @PostMapping
     @ApiOperation("新增菜品")
@@ -74,5 +79,30 @@ public class DishController {
         log.info("根据分类Id查询菜品 {}",categoryId);
         List<Dish> list = dishService.list(categoryId);
         return Result.success(list);
+    }
+
+    /**
+     * 设置菜品库存（Redis）
+     */
+    @PostMapping("/stock")
+    @ApiOperation("设置菜品库存")
+    public Result setStock(@RequestBody Map<String, Object> params) {
+        Long dishId = Long.valueOf(params.get("dishId").toString());
+        Integer stock = Integer.valueOf(params.get("stock").toString());
+        String key = RedisLockUtil.getDishStockKey(dishId);
+        redisTemplate.opsForValue().set(key, stock);
+        log.info("设置菜品库存 dishId={}, stock={}", dishId, stock);
+        return Result.success();
+    }
+
+    /**
+     * 查询菜品库存（Redis）
+     */
+    @GetMapping("/stock/{id}")
+    @ApiOperation("查询菜品库存")
+    public Result<Integer> getStock(@PathVariable Long id) {
+        String key = RedisLockUtil.getDishStockKey(id);
+        Integer stock = (Integer) redisTemplate.opsForValue().get(key);
+        return Result.success(stock);
     }
 }

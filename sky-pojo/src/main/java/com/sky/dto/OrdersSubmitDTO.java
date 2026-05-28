@@ -28,4 +28,6 @@ public class OrdersSubmitDTO implements Serializable {
     private Integer packAmount;
     //总金额
     private BigDecimal amount;
+    //防重 Token（用于幂等性校验）
+    private String orderToken;
 }
